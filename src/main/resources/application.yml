@@ -12,16 +12,33 @@ spring:
     consumer:
       bootstrap-servers: localhost:9092
       group-id: payment-processor-group
-      auto-offset-reset: earliest # Starts consumption from earliest offset for new consumer groups.
-      max-poll-records: 100 # Batches up to 100 records per poll, balancing throughput and memory pressure.
+      enable-auto-commit: false
+      auto-offset-reset: earliest
+      max-poll-records: 50
       properties:
-        spring.json.trusted.packages: '*' # Allows JSON deserialization for incoming DTO classes.
+        max.poll.interval.ms: 300000
+        session.timeout.ms: 15000
+        heartbeat.interval.ms: 3000
+        spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.StringDeserializer
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.value.default.type: com.example.paymentprocessor.dto.PaymentSubmittedEvent
+        spring.json.trusted.packages: com.example.paymentprocessor.dto
+        spring.json.use.type.headers: false
+      key-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
     listener:
-      concurrency: 6 # One concurrent consumer thread per partition target, enabling parallel processing.
-      ack-mode: batch # Commits offsets after each consumed batch for efficient acknowledgment.
+      concurrency: 6
+      ack-mode: record
+      missing-topics-fatal: false
+      type: single
+      poll-timeout: 1500
     producer:
+      bootstrap-servers: localhost:9092
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
 
 management:
   endpoints:
@@ -32,6 +49,13 @@ management:
     health:
       probes:
         enabled: true
+
+logging:
+  level:
+    org.springframework.kafka.listener.DefaultErrorHandler: DEBUG
+    org.springframework.kafka.support.serializer.ErrorHandlingDeserializer: DEBUG
+    org.apache.kafka.clients.consumer.internals: INFO
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
